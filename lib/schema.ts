@@ -24,6 +24,7 @@ export const workflows = pgTable(
 export type WorkflowGraph = {
   nodes: Array<Record<string, unknown>>
   edges: Array<Record<string, unknown>>
+  jsonl?: string
 }
 
 export type Workflow = typeof workflows.$inferSelect
