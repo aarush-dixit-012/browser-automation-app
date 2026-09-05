@@ -10,12 +10,7 @@ import {
   useState,
 } from "react"
 import { useOrganization, useUser } from "@clerk/nextjs"
-import {
-  createWorkflow as createWorkflowAction,
-  deleteWorkflow as deleteWorkflowAction,
-  getWorkflows,
-  updateWorkflow as updateWorkflowAction,
-} from "@/lib/actions/workflows"
+import { toast } from "@/components/ui/toast"
 import {
   getCurrentUserPlan,
   type CurrentUserPlan,
@@ -46,6 +41,7 @@ type AppContextValue = {
   workflows: Workflow[]
   workflowsLoading: boolean
   workflowsError: string | null
+  refresh: () => Promise<void>
   refreshWorkflows: () => Promise<void>
   createWorkflow: (input: {
     title: string
@@ -59,6 +55,15 @@ type AppContextValue = {
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
+
+async function callApi(url: string, init?: RequestInit) {
+  const response = await fetch(url, init)
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(data?.error ?? `Request failed (${response.status})`)
+  }
+  return data
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded: isUserLoaded } = useUser()
@@ -74,13 +79,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [workflowsLoading, startWorkflowsTransition] = useTransition()
   const [workflowsError, setWorkflowsError] = useState<string | null>(null)
 
+  const refreshPlan = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      startPlanTransition(async () => {
+        try {
+          setPlan(await getCurrentUserPlan())
+        } finally {
+          resolve()
+        }
+      })
+    })
+  }, [])
+
   const refreshWorkflows = useCallback(() => {
     return new Promise<void>((resolve) => {
       startWorkflowsTransition(async () => {
         setWorkflowsError(null)
         try {
-          const rows = await getWorkflows()
-          setWorkflows(rows)
+          const response = await fetch("/api/workflows", {
+            cache: "no-store",
+          })
+          if (!response.ok) {
+            throw new Error("Failed to load workflows")
+          }
+          const data = (await response.json()) as { workflows: Workflow[] }
+          setWorkflows(data.workflows)
         } catch (error) {
           setWorkflowsError((error as Error).message)
         } finally {
@@ -102,33 +125,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })
   }, [userId, orgId])
 
+  const refresh = useCallback(async () => {
+    await Promise.all([refreshWorkflows(), refreshPlan()])
+  }, [refreshWorkflows, refreshPlan])
+
   const createWorkflow = useCallback(
     async (input: { title: string; graph?: WorkflowGraph }) => {
-      const workflow = await createWorkflowAction(input)
-      await refreshWorkflows()
-      return workflow
+      try {
+        const data = (await callApi("/api/workflows", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        })) as { workflow: Workflow }
+        toast.add({
+          type: "success",
+          title: "Workflow created",
+          description: `"${data.workflow.title}" was created`,
+        })
+        await refresh()
+        return data.workflow
+      } catch (error) {
+        toast.add({
+          type: "error",
+          title: "Create failed",
+          description: (error as Error).message,
+        })
+        throw error
+      }
     },
-    [refreshWorkflows]
+    [refresh]
   )
 
   const updateWorkflow = useCallback(
-    async (
-      id: string,
-      input: { title?: string; graph?: WorkflowGraph }
-    ) => {
-      const workflow = await updateWorkflowAction(id, input)
-      await refreshWorkflows()
-      return workflow
+    async (id: string, input: { title?: string; graph?: WorkflowGraph }) => {
+      try {
+        const data = (await callApi(`/api/workflows?id=${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        })) as { workflow: Workflow }
+        toast.add({
+          type: "success",
+          title: "Workflow updated",
+          description: `"${data.workflow.title}" was updated`,
+        })
+        await refresh()
+        return data.workflow
+      } catch (error) {
+        toast.add({
+          type: "error",
+          title: "Update failed",
+          description: (error as Error).message,
+        })
+        throw error
+      }
     },
-    [refreshWorkflows]
+    [refresh]
   )
 
   const deleteWorkflow = useCallback(
     async (id: string) => {
-      await deleteWorkflowAction(id)
-      await refreshWorkflows()
+      try {
+        await callApi(`/api/workflows?id=${id}`, { method: "DELETE" })
+        toast.add({
+          type: "success",
+          title: "Workflow deleted",
+          description: "The workflow was deleted",
+        })
+        await refresh()
+      } catch (error) {
+        toast.add({
+          type: "error",
+          title: "Delete failed",
+          description: (error as Error).message,
+        })
+        throw error
+      }
     },
-    [refreshWorkflows]
+    [refresh]
   )
 
   const user = useMemo<AppUser>(
@@ -173,6 +247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       workflows: scopedWorkflows,
       workflowsLoading,
       workflowsError,
+      refresh,
       refreshWorkflows,
       createWorkflow,
       updateWorkflow,
@@ -186,6 +261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       scopedWorkflows,
       workflowsLoading,
       workflowsError,
+      refresh,
       refreshWorkflows,
       createWorkflow,
       updateWorkflow,
