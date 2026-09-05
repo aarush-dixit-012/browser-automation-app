@@ -1,6 +1,5 @@
 import Image from "next/image"
-import { PlusIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { CreateWorkflowDialog } from "@/components/shared/dialog/create-workflow"
 
 export default function Page() {
   return (
@@ -23,10 +22,7 @@ export default function Page() {
             one to begin automating.
           </p>
         </div>
-        <Button className="mt-1">
-          <PlusIcon className="size-4" />
-          Create workflow
-        </Button>
+        <CreateWorkflowDialog />
       </div>
     </div>
   )
