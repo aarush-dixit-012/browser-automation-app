@@ -12,10 +12,11 @@ import {
 } from "@xyflow/react"
 import {
   BotIcon,
+  DatabaseIcon,
   EyeIcon,
   FlagIcon,
+  LinkIcon,
   PlayIcon,
-  SparklesIcon,
   Trash2Icon,
   ZapIcon,
   type LucideIcon,
@@ -31,10 +32,11 @@ export type Node = {
 export type StepNodeType =
   | "start"
   | "end"
+  | "open-url"
   | "act"
   | "observe"
+  | "extract"
   | "agent"
-  | "ai"
 
 export type StepNodeData = {
   type: StepNodeType
@@ -69,11 +71,19 @@ export const nodeRegistry: Record<StepNodeType, NodeDefinition> = {
     icon: FlagIcon,
     accent: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
   },
+  "open-url": {
+    type: "open-url",
+    name: "Open URL",
+    kind: "step",
+    parameters: { url: "url" },
+    icon: LinkIcon,
+    accent: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+  },
   act: {
     type: "act",
     name: "Act",
     kind: "step",
-    parameters: { text: "string" },
+    parameters: { instruction: "string" },
     icon: ZapIcon,
     accent: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   },
@@ -81,25 +91,25 @@ export const nodeRegistry: Record<StepNodeType, NodeDefinition> = {
     type: "observe",
     name: "Observe",
     kind: "step",
-    parameters: { text: "string" },
+    parameters: { instruction: "string" },
     icon: EyeIcon,
     accent: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  },
+  extract: {
+    type: "extract",
+    name: "Extract",
+    kind: "step",
+    parameters: { instruction: "string", fields: "json" },
+    icon: DatabaseIcon,
+    accent: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   },
   agent: {
     type: "agent",
     name: "Agent",
     kind: "step",
-    parameters: { text: "string" },
+    parameters: { task: "string", maxSteps: "number" },
     icon: BotIcon,
     accent: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
-  },
-  ai: {
-    type: "ai",
-    name: "AI",
-    kind: "step",
-    parameters: { text: "string" },
-    icon: SparklesIcon,
-    accent: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
   },
 }
 
@@ -125,7 +135,6 @@ function StepNodeComponent({ id, data, selected }: NodeProps<StepNode>) {
   const Icon = def.icon
   const { deleteElements } = useReactFlow()
 
-  // A trigger starts the flow and takes no input, so it has no target handle.
   const hasTarget = kind !== "trigger"
 
   return (
@@ -183,8 +192,9 @@ export const StepNode = memo(StepNodeComponent)
 export const nodeTypes = {
   start: StepNode,
   end: StepNode,
+  "open-url": StepNode,
   act: StepNode,
   observe: StepNode,
+  extract: StepNode,
   agent: StepNode,
-  ai: StepNode,
 } satisfies NodeTypes

@@ -27,7 +27,6 @@ import "@xyflow/react/dist/style.css"
 import { cn } from "@/lib/utils"
 import { NodePropertiesPanel } from "@/components/shared/workflow/node-properties-panel"
 import {
-  getNodeType,
   nodeRegistry,
   nodeTypes,
   type StepNode,
@@ -205,7 +204,7 @@ function WorkflowCanvasInner({
                       onDragStart={(event) => {
                         event.dataTransfer.setData(
                           "application/reactflow",
-                          getNodeType(node.name)
+                          node.type
                         )
                         event.dataTransfer.effectAllowed = "move"
                       }}
